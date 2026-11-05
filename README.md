@@ -41,10 +41,17 @@ or `make`. Any C11 compiler works (`tcc -o health health.c` too).
 ## Usage
 
 ```
-./health [path ...]
+./health [--json] [path ...]
 ```
 
 Paths are mounts to check disk usage on (default `/`).
+
+`--json` prints one JSON object on a single line instead, for scripts and
+dashboards. Metrics that couldn't be read are `null`:
+
+```
+{"host":"myserver","load":[0.02,0.12,0.15],"uptime_s":617760,"cpu":{"busy_pct":0.0,"cores":4},"mem":{"used_pct":7.5,"used_mib":847,"total_mib":11352},"swap":{"used_pct":0.0,"used_mib":0,"total_mib":4096},"disks":[{"path":"/","used_pct":2.1,"free_gib":423.4,"total_gib":456.3}],"temps":[{"name":"x86_pkg_temp","zone":2,"celsius":48.0}],"status":0}
+```
 
 Exit code: `0` ok, `1` a threshold was crossed (line marked `!!`), `2` a read
 failed. That makes it easy to use from cron or a systemd timer.

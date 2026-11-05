@@ -1,7 +1,3 @@
-// health.c - tiny server health reader (Linux: /proc, /sys, statvfs)
-// Build: make    Usage: ./health [--json] [path ...]   (paths default to "/")
-// Exit code: 0 ok, 1 warning (thresholds below), 2 read error
-
 #define _GNU_SOURCE
 #include <dirent.h>
 #include <stdio.h>
@@ -18,7 +14,7 @@
 
 static int status = 0;
 static int json = 0;
-static int top = 0; // fields emitted so far in the top-level JSON object
+static int nfield = 0;
 
 static void jsep(int *n)
 {
@@ -58,12 +54,11 @@ static const char *flag(double v, double limit)
 	return "";
 }
 
-// metric could not be read: "key unavailable" in text mode, null in JSON
 static void na(const char *key)
 {
 	warn(2);
 	if (json) {
-		jsep(&top);
+		jsep(&nfield);
 		printf("\"%s\":null", key);
 	} else
 		printf("%-8s unavailable\n", key);
@@ -113,7 +108,7 @@ static void show_cpu(void)
 	pct = 100.0 * (1.0 - (double)(b.idle - a.idle) / (double)(b.total - a.total));
 	fl = flag(pct, WARN_CPU);
 	if (json) {
-		jsep(&top);
+		jsep(&nfield);
 		printf("\"cpu\":{\"busy_pct\":%.1f,\"cores\":%ld}", pct,
 		       sysconf(_SC_NPROCESSORS_ONLN));
 	} else
@@ -129,7 +124,7 @@ static void show_load_uptime(void)
 	f = fopen("/proc/loadavg", "r");
 	if (f && fscanf(f, "%lf %lf %lf", &l1, &l5, &l15) == 3) {
 		if (json) {
-			jsep(&top);
+			jsep(&nfield);
 			printf("\"load\":[%.2f,%.2f,%.2f]", l1, l5, l15);
 		} else
 			printf("load     %.2f %.2f %.2f\n", l1, l5, l15);
@@ -143,7 +138,7 @@ static void show_load_uptime(void)
 		long s = (long)up;
 
 		if (json) {
-			jsep(&top);
+			jsep(&nfield);
 			printf("\"uptime_s\":%ld", s);
 		} else
 			printf("uptime   %ldd %ldh %ldm\n", s / 86400, s % 86400 / 3600, s % 3600 / 60);
@@ -183,10 +178,10 @@ static void show_mem(void)
 	double swap_used = swap_t ? 100.0 * (double)(swap_t - swap_f) / (double)swap_t : 0;
 
 	if (json) {
-		jsep(&top);
+		jsep(&nfield);
 		printf("\"mem\":{\"used_pct\":%.1f,\"used_mib\":%.0f,\"total_mib\":%.0f}",
 		       used, (total - avail) / 1024.0, total / 1024.0);
-		jsep(&top);
+		jsep(&nfield);
 		if (swap_t)
 			printf("\"swap\":{\"used_pct\":%.1f,\"used_mib\":%.0f,\"total_mib\":%.0f}",
 			       swap_used, (swap_t - swap_f) / 1024.0, swap_t / 1024.0);
@@ -321,7 +316,7 @@ int main(int argc, char **argv)
 	gethostname(host, sizeof host);
 	if (json) {
 		putchar('{');
-		jsep(&top);
+		jsep(&nfield);
 		printf("\"host\":");
 		jstr(host);
 	} else
@@ -330,7 +325,7 @@ int main(int argc, char **argv)
 	show_cpu();
 	show_mem();
 	if (json) {
-		jsep(&top);
+		jsep(&nfield);
 		printf("\"disks\":[");
 	}
 	for (i = 0; i < np; i++)

@@ -1,7 +1,7 @@
 # serverhealth
 
 A small C tool that prints a quick health check of a Linux box: load, uptime,
-CPU, memory, disk and temperatures. One file, no dependencies.
+CPU, memory, disk, network and temperatures. One file, no dependencies.
 
 ```
 == myserver ==
@@ -11,6 +11,7 @@ cpu        0.0% busy (4 cores)
 mem        7.5% used (847 / 11352 MiB)
 swap       0.0% used (0 / 4096 MiB)
 disk     /:   2.1% used (423.4 GiB free of 456.3)
+net      enp3s0: rx 1.2 KiB/s  tx 0.4 KiB/s
 temp     x86_pkg_temp (zone2): 48.0 C
 ```
 

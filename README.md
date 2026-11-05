@@ -32,6 +32,6 @@ Pass mount points to check disks (default `/`). `--json` prints one line of
 JSON instead. Exit code is `0` fine, `1` something crossed a threshold
 (90% CPU/mem/disk, 80 C, editable at the top of `health.c`), `2` a read failed.
 
-Linux only.
+Linux only (yet)
 
 MIT license.

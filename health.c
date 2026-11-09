@@ -229,6 +229,92 @@ static void show_disk(const char *path)
 		       avail / (1 << 30), total / (1 << 30), fl);
 }
 
+#define MAX_IF 16
+
+struct iface {
+	char name[32];
+	unsigned long long rx, tx;
+};
+
+static int nnet = 0;
+
+static int read_net(struct iface *v)
+{
+	FILE *f = fopen("/proc/net/dev", "r");
+	char line[256];
+	int n = 0;
+
+	if (!f)
+		return -1;
+	while (n < MAX_IF && fgets(line, sizeof line, f)) {
+		char *colon = strchr(line, ':');
+		char *name = line;
+
+		if (!colon)
+			continue;
+		*colon = '\0';
+		while (*name == ' ')
+			name++;
+		if (sscanf(colon + 1, "%llu %*u %*u %*u %*u %*u %*u %*u %llu",
+			   &v[n].rx, &v[n].tx) != 2)
+			continue;
+		snprintf(v[n].name, sizeof v[n].name, "%.31s", name);
+		n++;
+	}
+	fclose(f);
+	return n;
+}
+
+static void fmt_rate(double bps, char *buf, size_t len)
+{
+	if (bps >= 1048576)
+		snprintf(buf, len, "%.1f MiB/s", bps / 1048576);
+	else
+		snprintf(buf, len, "%.1f KiB/s", bps / 1024);
+}
+
+static void show_net(const struct iface *a, int ca, const struct iface *b, int cb,
+		     double secs)
+{
+	int i, j;
+
+	if (ca < 0 || cb < 0 || secs <= 0) {
+		na("net");
+		return;
+	}
+	if (json) {
+		jsep(&nfield);
+		printf("\"net\":[");
+	}
+	for (i = 0; i < cb; i++) {
+		double rx = 0, tx = 0;
+		char rs[24], ts[24];
+
+		if (!strcmp(b[i].name, "lo"))
+			continue;
+		for (j = 0; j < ca && strcmp(a[j].name, b[i].name); j++)
+			;
+		if (j == ca)
+			continue;
+		if (b[i].rx >= a[j].rx)
+			rx = (double)(b[i].rx - a[j].rx) / secs;
+		if (b[i].tx >= a[j].tx)
+			tx = (double)(b[i].tx - a[j].tx) / secs;
+		if (json) {
+			jsep(&nnet);
+			printf("{\"iface\":");
+			jstr(b[i].name);
+			printf(",\"rx_bps\":%.0f,\"tx_bps\":%.0f}", rx, tx);
+		} else {
+			fmt_rate(rx, rs, sizeof rs);
+			fmt_rate(tx, ts, sizeof ts);
+			printf("net      %s: rx %s  tx %s\n", b[i].name, rs, ts);
+		}
+	}
+	if (json)
+		putchar(']');
+}
+
 #define MAX_ZONES 32
 
 struct zone {
@@ -302,7 +388,9 @@ int main(int argc, char **argv)
 {
 	char host[256] = "?";
 	const char *paths[argc + 1];
-	int i, np = 0;
+	struct iface net0[MAX_IF], net1[MAX_IF];
+	struct timespec t0, t1;
+	int i, np = 0, c0, c1;
 
 	for (i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--json"))
@@ -322,7 +410,11 @@ int main(int argc, char **argv)
 	} else
 		printf("== %s ==\n", host);
 	show_load_uptime();
+	c0 = read_net(net0);
+	clock_gettime(CLOCK_MONOTONIC, &t0);
 	show_cpu();
+	c1 = read_net(net1);
+	clock_gettime(CLOCK_MONOTONIC, &t1);
 	show_mem();
 	if (json) {
 		jsep(&nfield);
@@ -331,7 +423,13 @@ int main(int argc, char **argv)
 	for (i = 0; i < np; i++)
 		show_disk(paths[i]);
 	if (json)
-		printf("],\"temps\":[");
+		putchar(']');
+	show_net(net0, c0, net1, c1,
+		 (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9);
+	if (json) {
+		jsep(&nfield);
+		printf("\"temps\":[");
+	}
 	show_temps();
 	if (json)
 		printf("],\"status\":%d}\n", status);

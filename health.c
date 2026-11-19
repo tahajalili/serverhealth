@@ -265,6 +265,12 @@ static int read_net(struct iface *v)
 	return n;
 }
 
+static int hidden_iface(const char *n)
+{
+	return !strcmp(n, "lo") || !strcmp(n, "docker0") ||
+	       !strncmp(n, "br-", 3) || !strncmp(n, "veth", 4);
+}
+
 static void fmt_rate(double bps, char *buf, size_t len)
 {
 	if (bps >= 1048576)
@@ -290,7 +296,7 @@ static void show_net(const struct iface *a, int ca, const struct iface *b, int c
 		double rx = 0, tx = 0;
 		char rs[24], ts[24];
 
-		if (!strcmp(b[i].name, "lo"))
+		if (hidden_iface(b[i].name))
 			continue;
 		for (j = 0; j < ca && strcmp(a[j].name, b[i].name); j++)
 			;
